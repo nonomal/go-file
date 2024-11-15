@@ -1,15 +1,16 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-contrib/sessions/redis"
 	"github.com/gin-gonic/gin"
+	"github.com/jinzhu/gorm"
 	"go-file/common"
 	"go-file/model"
 	"go-file/router"
 	"html/template"
-	"log"
 	"os"
 	"strconv"
 )
@@ -23,20 +24,27 @@ func loadTemplate() *template.Template {
 }
 
 func main() {
+	common.SetupGinLog()
+	common.SysLog(fmt.Sprintf("Go File %s started at port %d", common.Version, *common.Port))
 	if os.Getenv("GIN_MODE") != "debug" {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	// Initialize SQL Database
 	db, err := model.InitDB()
 	if err != nil {
-		log.Fatal(err)
+		common.FatalLog(err)
 	}
-	defer db.Close()
+	defer func(db *gorm.DB) {
+		err := db.Close()
+		if err != nil {
+			common.FatalLog("failed to close database: " + err.Error())
+		}
+	}(db)
 
 	// Initialize Redis
 	err = common.InitRedisClient()
 	if err != nil {
-		log.Fatal(err.Error())
+		common.FatalLog(err)
 	}
 
 	// Initialize options
@@ -47,32 +55,40 @@ func main() {
 	server.SetHTMLTemplate(loadTemplate())
 
 	// Initialize session store
+	var store sessions.Store
 	if common.RedisEnabled {
 		opt := common.ParseRedisOption()
-		store, _ := redis.NewStore(opt.MinIdleConns, opt.Network, opt.Addr, opt.Password, []byte(common.SessionSecret))
-		server.Use(sessions.Sessions("session", store))
+		store, _ = redis.NewStore(opt.MinIdleConns, opt.Network, opt.Addr, opt.Password, []byte(common.SessionSecret))
 	} else {
-		store := cookie.NewStore([]byte(common.SessionSecret))
-		server.Use(sessions.Sessions("session", store))
+		store = cookie.NewStore([]byte(common.SessionSecret))
 	}
+	store.Options(sessions.Options{
+		HttpOnly: true,
+	})
+	server.Use(sessions.Sessions("session", store))
 
 	router.SetRouter(server)
 	var realPort = os.Getenv("PORT")
 	if realPort == "" {
 		realPort = strconv.Itoa(*common.Port)
 	}
-	if *common.Host == "localhost" {
+	if *common.Host == "" {
 		ip := common.GetIp()
 		if ip != "" {
 			*common.Host = ip
+		} else {
+			*common.Host = "localhost"
 		}
 	}
 	serverUrl := "http://" + *common.Host + ":" + realPort + "/"
 	if !*common.NoBrowser {
 		common.OpenBrowser(serverUrl)
 	}
+	if *common.EnableP2P {
+		go common.StartP2PServer()
+	}
 	err = server.Run(":" + realPort)
 	if err != nil {
-		log.Println(err)
+		common.FatalLog(err)
 	}
 }

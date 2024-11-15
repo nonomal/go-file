@@ -24,6 +24,15 @@ func GetOptions(c *gin.Context) {
 	return
 }
 
+func GetNotice(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data":    common.OptionMap["Notice"],
+	})
+	return
+}
+
 func UpdateOption(c *gin.Context) {
 	var option model.Option
 	err := json.NewDecoder(c.Request.Body).Decode(&option)
@@ -45,6 +54,19 @@ func UpdateOption(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
+	})
+	return
+}
+
+func GetStatus(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"version":     common.Version,
+			"p2p_port":    *common.P2PPort,
+			"p2p_enabled": *common.EnableP2P,
+		},
 	})
 	return
 }

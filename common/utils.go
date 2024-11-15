@@ -3,8 +3,8 @@ package common
 import (
 	"fmt"
 	"html/template"
-	"log"
 	"net"
+	"os"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -12,46 +12,54 @@ import (
 )
 
 func OpenBrowser(url string) {
-	var err error
-
 	switch runtime.GOOS {
 	case "linux":
-		err = exec.Command("xdg-open", url).Start()
+		_ = exec.Command("xdg-open", url).Start()
 	case "windows":
-		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+		_ = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
 	case "darwin":
-		err = exec.Command("open", url).Start()
-	}
-	if err != nil {
-		log.Println(err)
+		_ = exec.Command("open", url).Start()
 	}
 }
 
 func GetIp() (ip string) {
+	backupIp := "127.0.0.1"
 	ips, err := net.InterfaceAddrs()
 	if err != nil {
-		log.Println(err)
-		return ip
+		SysError("failed to get IP address: " + err.Error())
+		return backupIp
 	}
-
 	for _, a := range ips {
 		if ipNet, ok := a.(*net.IPNet); ok && !ipNet.IP.IsLoopback() {
 			if ipNet.IP.To4() != nil {
 				ip = ipNet.IP.String()
 				if strings.HasPrefix(ip, "10") {
-					return
+					// Class A: 10.0.0.0 to 10.255.255.255
+					backupIp = ip
+					continue
 				}
 				if strings.HasPrefix(ip, "172") {
-					return
+					// Class B: 172.16.0.0 to 172.31.255.255
+					parts := strings.Split(ip, ".")
+					secondPart, err := strconv.Atoi(parts[1])
+					if err != nil {
+						continue
+					}
+					if secondPart >= 16 && secondPart <= 31 {
+						backupIp = ip
+						continue
+					}
 				}
 				if strings.HasPrefix(ip, "192.168") {
-					return
+					// Class C: 192.168.0.0 to 192.168.255.255
+					backupIp = ip
+					continue
 				}
-				ip = ""
+				return
 			}
 		}
 	}
-	return
+	return backupIp
 }
 
 var sizeKB = 1024
@@ -62,18 +70,17 @@ func Bytes2Size(num int64) string {
 	numStr := ""
 	unit := "B"
 	if num/int64(sizeGB) > 1 {
-		numStr = fmt.Sprintf("%f", float64(num)/float64(sizeGB))
+		numStr = fmt.Sprintf("%.2f", float64(num)/float64(sizeGB))
 		unit = "GB"
 	} else if num/int64(sizeMB) > 1 {
-		numStr = fmt.Sprintf("%f", float64(num)/float64(sizeMB))
+		numStr = fmt.Sprintf("%d", int(float64(num)/float64(sizeMB)))
 		unit = "MB"
 	} else if num/int64(sizeKB) > 1 {
-		numStr = fmt.Sprintf("%f", float64(num)/float64(sizeKB))
+		numStr = fmt.Sprintf("%d", int(float64(num)/float64(sizeKB)))
 		unit = "KB"
 	} else {
 		numStr = fmt.Sprintf("%d", num)
 	}
-	numStr = strings.Split(numStr, ".")[0]
 	return numStr + " " + unit
 }
 
@@ -124,4 +131,22 @@ func IntMax(a int, b int) int {
 	} else {
 		return b
 	}
+}
+
+func IsMobileUserAgent(userAgent string) bool {
+	return strings.Contains(userAgent, "Mobile") || strings.Contains(userAgent, "Android") || strings.Contains(userAgent, "iPhone") || strings.Contains(userAgent, "iPad")
+}
+
+func MakeDirIfNotExist(dir string) error {
+	if _, err := os.Stat(dir); err != nil {
+		if os.IsNotExist(err) {
+			err = os.MkdirAll(dir, 0755)
+			if err != nil {
+				return err
+			}
+		} else {
+			return err
+		}
+	}
+	return nil
 }

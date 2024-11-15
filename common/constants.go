@@ -3,18 +3,21 @@ package common
 import (
 	"embed"
 	"flag"
+	"fmt"
 	"github.com/google/uuid"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
 var StartTime = time.Now()
-var Version = "v0.4.2"
+var Version = "v0.0.0"
 var OptionMap map[string]string
 
 var ItemsPerPage = 10
+var AbstractTextLength = 40
 
 var ExplorerCacheEnabled = false // After my test, enable this will make the server slower...
 var ExplorerCacheTimeout = 600   // Second
@@ -51,11 +54,16 @@ const (
 )
 
 var (
-	Port      = flag.Int("port", 3000, "specify the server listening port.")
-	Host      = flag.String("host", "localhost", "the server's ip address or domain")
-	Path      = flag.String("path", "", "specify a local path to public")
-	VideoPath = flag.String("video", "", "specify a video folder to public")
-	NoBrowser = flag.Bool("no-browser", false, "open browser or not")
+	Port         = flag.Int("port", 3000, "Specify the server listening port.")
+	Host         = flag.String("host", "", "The server's IP address or domain.")
+	Path         = flag.String("path", "", "Specify a local path to public.")
+	VideoPath    = flag.String("video", "", "Specify a folder containing videos to be made public.")
+	NoBrowser    = flag.Bool("no-browser", false, "Do not open browser automatically.")
+	PrintVersion = flag.Bool("version", false, "Print version information.")
+	EnableP2P    = flag.Bool("enable-p2p", false, "Enable peer-to-peer relay or not.")
+	P2PPort      = flag.Int("p2p-port", 9377, "Specify the P2P listening port.")
+	LogDir       = flag.String("log-dir", "", "Specify the directory for log files.")
+	PrintHelp    = flag.Bool("help", false, "Print usage information.")
 )
 
 // UploadPath Maybe override by ENV_VAR
@@ -69,9 +77,34 @@ var FS embed.FS
 
 var SessionSecret = uuid.New().String()
 
-var SQLitePath = ".go-file.db"
+var SQLitePath = "go-file.db"
+
+func printHelp() {
+	fmt.Println(fmt.Sprintf("Go File %s - A simple file sharing tool.", Version))
+	fmt.Println("Copyright (C) 2023 JustSong. All rights reserved.")
+	fmt.Println("GitHub: https://github.com/songquanpeng/go-file")
+	fmt.Println("Usage: go-file [options]")
+	fmt.Println("Options:")
+	flag.CommandLine.VisitAll(func(f *flag.Flag) {
+		name := fmt.Sprintf("-%s", f.Name)
+		usage := strings.Replace(f.Usage, "\n", "\n    ", -1)
+		fmt.Printf("        -%-14s%s\n", name, usage)
+	})
+	os.Exit(0)
+}
 
 func init() {
+	flag.Parse()
+
+	if *PrintHelp {
+		printHelp()
+	}
+
+	if *PrintVersion {
+		fmt.Println(Version)
+		os.Exit(0)
+	}
+
 	if os.Getenv("SESSION_SECRET") != "" {
 		SessionSecret = os.Getenv("SESSION_SECRET")
 	}
@@ -84,7 +117,6 @@ func init() {
 		ImageUploadPath = path.Join(UploadPath, "images")
 		VideoServePath = UploadPath
 	}
-	flag.Parse()
 	if *Path != "" {
 		ExplorerRootPath = *Path
 	}

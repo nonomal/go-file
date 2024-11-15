@@ -55,6 +55,7 @@ function deleteFile(id, link) {
                 showMessage(data.message, true);
             } else {
                 document.getElementById("file-" + id).style.display = 'none';
+                showToast(`文件删除成功：${link}`)
             }
         })
     });
@@ -99,7 +100,7 @@ function onFileInputChange() {
     if (files.length === 1) {
         prompt = '已选择文件: ' + files[0].name;
     } else {
-        prompt = `已选择 ${files.length}个文件`;
+        prompt = `已选择 ${files.length} 个文件`;
     }
     document.getElementById('uploadFileDialogTitle').innerText = prompt;
 }
@@ -116,13 +117,17 @@ function uploadFile() {
     let fileUploadProgress = document.getElementById('fileUploadProgress');
     let fileUploadDetail = document.getElementById('fileUploadDetail');
     fileUploadCard.style.display = 'block';
-    closeUploadModal();
     let files = document.getElementById('fileInput').files;
+    let description = document.getElementById("fileUploadDescription").value;
+    if (files.length === 0 && description === "") {
+        return;
+    }
+    closeUploadModal();
     let formData = new FormData();
     for (let i = 0; i < files.length; i++) {
         formData.append("file", files[i]);
     }
-    formData.append("description", document.getElementById("fileUploadDescription").value);
+    formData.append("description", description);
 
     let path = "";
     if (location.href.split('/')[3].startsWith("explorer")) {
@@ -281,6 +286,13 @@ function showQRCode(link) {
     showModal('qrcodeModal');
 }
 
+function copyLink(link) {
+    let url = window.location.origin + link;
+    url = decodeURI(url);
+    copyText(url);
+    showToast(`已复制：${url}`, 'success');
+}
+
 function toLocalTime(str) {
     let date = Date.parse(str);
     return date.toLocaleString()
@@ -294,13 +306,19 @@ function copyText(text) {
     document.execCommand("copy");
 }
 
-function showToast(message, type = "success", timeout = 3000) {
+function showToast(message, type = "success", timeout = 2900) {
     let toast = document.getElementById("toast");
     toast.innerText = message;
     toast.className = `show notification is-${type}`;
     setTimeout(() => {
         toast.className = "";
     }, timeout);
+}
+
+function showGeneralModal(title, content) {
+    document.getElementById("generalModalTitle").innerText = title;
+    document.getElementById("generalModalContent").innerHTML = content;
+    showModal("generalModal");
 }
 
 async function loadOptions() {
@@ -331,7 +349,7 @@ async function loadOptions() {
     tab.innerHTML = html;
 }
 
-async function updateOption(key, inputElementId, originValue="") {
+async function updateOption(key, inputElementId, originValue = "") {
     let inputElement = document.getElementById(inputElementId);
     let value = inputElement.value;
     let response = await fetch("/api/option", {
@@ -434,10 +452,60 @@ async function generateNewToken() {
     });
     let result = await response.json();
     if (result.success) {
-        showToast(`Token 已重置为：${result.data}`, "success", 3000);
+        showToast(`Token 已重置为：${result.data}`, "success");
     } else {
         showToast(`操作失败：${result.message}`, "danger");
     }
+}
+
+function isMobile() {
+    return window.innerWidth <= 768;
+}
+
+function getFileExt(link) {
+    let parts = link.split('.');
+    if (parts.length === 1) return "";
+    return parts[parts.length - 1].toLowerCase();
+}
+
+function getFilename(link) {
+    let parts = link.split('/');
+    return parts[parts.length - 1];
+}
+
+function displayFile(link) {
+    // TODO: text file preview support
+    let ext = getFileExt(link);
+    let filename = getFilename(link);
+    console.log(link, ext, filename)
+    document.getElementById("displayModalTitle").innerText = filename;
+    if (ext === "mp3" || ext === "wav" || ext === "ogg") {
+        document.getElementById("displayModalContent").innerHTML = `
+        <audio controls>
+            <source src="${link}" type="audio/${ext}">
+        </audio>`;
+    } else if (ext === "mp4" || ext === "webm" || ext === "ogv") {
+        document.getElementById("displayModalContent").innerHTML = `
+        <video controls style="width: 100%">
+            <source src="${link}" type="video/${ext}">
+        </video>`;
+    } else if (ext === "png" || ext === "jpg" || ext === "jpeg" || ext === "gif") {
+        document.getElementById("displayModalContent").innerHTML = `
+        <img src="${link}" alt="${filename}" width="100%">`;
+    } else if (ext === "pdf") {
+        if (isMobile()) {
+            window.open(link);
+            return;
+        }
+        document.getElementById("displayModalContent").innerHTML = `
+        <div style="width:100%; height: 600px!important;">
+            <iframe src="${link}" width="100%" height="100%"></iframe>
+        </div>`;
+    } else {
+        window.open(link);
+        return;
+    }
+    showModal("displayModal");
 }
 
 function init() {

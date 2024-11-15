@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go-file/common"
 	"go-file/model"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -44,9 +45,6 @@ func UploadFile(c *gin.Context) {
 	}
 
 	description := c.PostForm("description")
-	if description == "" {
-		description = "无描述信息"
-	}
 	uploader := c.GetString("username")
 	if uploader == "" {
 		uploader = "匿名用户"
@@ -58,26 +56,68 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 	files := form.File["file"]
+	createTextFile := false
+	if files == nil && description != "" {
+		createTextFile = true
+		file := &multipart.FileHeader{
+			Filename: "text.txt",
+			Header:   nil,
+			Size:     0,
+		}
+		files = append(files, file)
+	}
+	t := time.Now()
+	subfolder := t.Format("2006-01")
+	err = common.MakeDirIfNotExist(filepath.Join(uploadPath, subfolder))
+	if err != nil {
+		common.SysError("failed to create folder: " + err.Error())
+		c.Status(http.StatusInternalServerError)
+		return
+	}
 	for _, file := range files {
 		// In case someone wants to upload to other folders.
 		filename := filepath.Base(file.Filename)
-		link := filename
-		savePath := filepath.Join(uploadPath, filename)
+		link := fmt.Sprintf("%s/%s", subfolder, filename)
+		savePath := filepath.Join(uploadPath, subfolder, filename)
 		if _, err := os.Stat(savePath); err == nil {
 			// File already existed.
-			t := time.Now()
 			timestamp := t.Format("_2006-01-02_15-04-05")
 			ext := filepath.Ext(filename)
 			if ext == "" {
 				link += timestamp
 			} else {
-				link = filename[:len(filename)-len(ext)] + timestamp + ext
+				link = subfolder + "/" + filename[:len(filename)-len(ext)] + timestamp + ext
 			}
 			savePath = filepath.Join(uploadPath, link)
 		}
-		if err := c.SaveUploadedFile(file, savePath); err != nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("upload file err: %s", err.Error()))
-			return
+		if createTextFile {
+			// Create a new text file and then write the description to it.
+			filename = "文本分享"
+			f, err := os.Create(savePath)
+			if err != nil {
+				message := "failed to create file: " + err.Error()
+				common.SysError(message)
+				c.String(http.StatusInternalServerError, message)
+				return
+			}
+			_, err = f.WriteString(description)
+			if err != nil {
+				message := "failed to write text to file: " + err.Error()
+				common.SysError(message)
+				c.String(http.StatusInternalServerError, message)
+				return
+			}
+			descriptionRune := []rune(description)
+			if len(descriptionRune) > common.AbstractTextLength {
+				description = fmt.Sprintf("内容摘要：%s...", string(descriptionRune[:common.AbstractTextLength]))
+			}
+		} else {
+			if err := c.SaveUploadedFile(file, savePath); err != nil {
+				message := "failed to save uploaded file: " + err.Error()
+				common.SysError(message)
+				c.String(http.StatusInternalServerError, message)
+				return
+			}
 		}
 		if saveToDatabase {
 			fileObj := &model.File{
@@ -89,7 +129,8 @@ func UploadFile(c *gin.Context) {
 			}
 			err = fileObj.Insert()
 			if err != nil {
-				_ = fmt.Errorf(err.Error())
+				common.SysError("failed to insert file to database: " + err.Error())
+				continue
 			}
 		}
 	}
@@ -128,16 +169,33 @@ func DeleteFile(c *gin.Context) {
 }
 
 func DownloadFile(c *gin.Context) {
-	path := c.Param("file")
-	fullPath := filepath.Join(common.UploadPath, path)
+	path := c.Param("filepath")
+	subfolder, filename := filepath.Split(path)
+	link := filename // Keep compatibility with old version
+	if subfolder != "/" {
+		link = fmt.Sprintf("%s%s", subfolder, filename)
+		link = strings.TrimPrefix(link, "/")
+	}
+	fullPath := filepath.Join(common.UploadPath, subfolder, filename)
 	if !strings.HasPrefix(fullPath, common.UploadPath) {
 		// We may being attacked!
 		c.Status(403)
 		return
 	}
-	c.File(fullPath)
+	if strings.HasSuffix(fullPath, ".txt") && common.IsMobileUserAgent(c.Request.UserAgent()) {
+		content, err := os.ReadFile(fullPath)
+		if err != nil {
+			c.Status(404)
+			return
+		}
+		c.HTML(http.StatusOK, "text-copy.html", gin.H{
+			"content": string(content),
+		})
+	} else {
+		c.File(fullPath)
+	}
 	// Update download counter
 	go func() {
-		model.UpdateDownloadCounter(path)
+		model.UpdateDownloadCounter(link)
 	}()
 }

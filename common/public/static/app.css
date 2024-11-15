@@ -4,6 +4,10 @@ body {
     margin: 0;
 }
 
+body::-webkit-scrollbar {
+    display: none;
+}
+
 nav {
     margin-bottom: 16px;
 }
@@ -44,6 +48,10 @@ a:hover {
     color: black;
 }
 
+.footer {
+    padding: 1.5rem 1.5rem 2rem;
+}
+
 code {
     font-family: Consolas, 'Courier New', monospace;
 }
@@ -79,6 +87,10 @@ code {
 
 .nav-shadow {
     box-shadow: 0 2px 3px rgba(26, 26, 26, .1);
+}
+
+.file-box {
+    padding: 18px 24px;
 }
 
 .box .article {
@@ -176,6 +188,7 @@ span.line {
 
 .file-link {
     color: #0a0a0a;
+    word-wrap: break-word;
 }
 
 #imageDropZone {
@@ -203,7 +216,7 @@ span.line {
     right: 0;
     text-align: center; /* Centered text */
     padding: 16px 32px; /* Padding */
-    position: fixed!important; /* Sit on top of the screen */
+    position: fixed !important; /* Sit on top of the screen */
     z-index: 99999; /* Add a z-index if needed */
     bottom: 30px; /* 30px from the bottom */
 }
@@ -219,21 +232,91 @@ span.line {
 
 /* Animations to fade the snackbar in and out */
 @-webkit-keyframes fadein {
-    from {bottom: 0; opacity: 0;}
-    to {bottom: 30px; opacity: 1;}
+    from {
+        bottom: 0;
+        opacity: 0;
+    }
+    to {
+        bottom: 30px;
+        opacity: 1;
+    }
 }
 
 @keyframes fadein {
-    from {bottom: 0; opacity: 0;}
-    to {bottom: 30px; opacity: 1;}
+    from {
+        bottom: 0;
+        opacity: 0;
+    }
+    to {
+        bottom: 30px;
+        opacity: 1;
+    }
 }
 
 @-webkit-keyframes fadeout {
-    from {bottom: 30px; opacity: 1;}
-    to {bottom: 0; opacity: 0;}
+    from {
+        bottom: 30px;
+        opacity: 1;
+    }
+    to {
+        bottom: 0;
+        opacity: 0;
+    }
 }
 
 @keyframes fadeout {
-    from {bottom: 30px; opacity: 1;}
-    to {bottom: 0; opacity: 0;}
+    from {
+        bottom: 30px;
+        opacity: 1;
+    }
+    to {
+        bottom: 0;
+        opacity: 0;
+    }
+}
+
+#notice {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    border-radius: 0.375em;
+    width: 23rem;
+    padding: 16px;
+}
+
+@media screen and (max-width: 768px) {
+    #notice {
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: auto;
+    }
+}
+
+#generalModalContent h2 {
+    font-size: 20px !important;
+}
+
+
+.modal-content::-webkit-scrollbar {
+    display: none; /* Safari and Chrome */
+}
+
+.video-sidebar {
+    max-height: 68vh !important;
+    overflow-y: scroll;
+}
+
+.hide-scrollbar::-webkit-scrollbar  {
+    display: none;
+}
+
+#videoPlayer {
+    max-height: 70vh !important;
+}
+
+.center-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }

@@ -18,6 +18,7 @@
                         <script>
                             // Credit: https://codepen.io/t7team/pen/ZowdRN
                             function openTab(e, tabName) {
+                                window.history.pushState("", "", `/manage?tab=${tabName}`);
                                 let i, x, tabLinks;
                                 x = document.getElementsByClassName('content-tab');
                                 for (i = 0; i < x.length; i++) {
@@ -40,15 +41,15 @@
                                         <div class="tabs">
                                             <ul style="margin-left: 0">
                                                 {{if .isAdmin}}
-                                                <li class="tab is-active" onclick="openTab(this,'statusTab')">
+                                                <li id="statusTabList" class="tab" onclick="openTab(this,'statusTab')">
                                                     <a>系统状况</a></li>
-                                                <li class="tab" onclick="openTab(this,'userTab')"><a>账户管理</a></li>
-                                                <li class="tab" onclick="openTab(this,'fileTab')"><a>文件管理</a></li>
-                                                <li class="tab" onclick="openTab(this,'settingTab')"><a>系统设置</a></li>
+                                                <li id="userTabList" class="tab" onclick="openTab(this,'userTab')"><a>账户管理</a></li>
+                                                <li id="fileTabList" class="tab" onclick="openTab(this,'fileTab')"><a>文件管理</a></li>
+                                                <li id="settingTabList" class="tab" onclick="openTab(this,'settingTab')"><a>系统设置</a></li>
                                                 {{else}}
-                                                <li class="tab is-active" onclick="openTab(this,'userTab')"><a>账户管理</a>
+                                                <li id="userTabList" class="tab" onclick="openTab(this,'userTab')"><a>账户管理</a>
                                                 </li>
-                                                <li class="tab" onclick="openTab(this,'fileTab')"><a>文件管理</a></li>
+                                                <li id="fileTabList" class="tab" onclick="openTab(this,'fileTab')"><a>文件管理</a></li>
                                                 {{end}}
                                             </ul>
                                         </div>
@@ -92,6 +93,31 @@
                                                     </div>
                                                 </div>
                                             </div>
+                                            <button id="checkUpdateBtn" class="button is-light" onclick="checkUpdate()">检查更新</button>
+                                            <script src="/public/lib/marked.umd.min.js"></script>
+                                            <script>
+                                                async function checkUpdate() {
+                                                    let currentVersion = "{{.option.Version}}";
+                                                    let checkUpdateBtn = document.getElementById("checkUpdateBtn");
+                                                    checkUpdateBtn.className += " is-loading";
+                                                    let res = await fetch("https://api.github.com/repos/songquanpeng/go-file/releases/latest");
+                                                    res = await res.json();
+                                                    if (res.tag_name === currentVersion) {
+                                                        showToast("已是最新版本");
+                                                    } else {
+                                                        let html = marked.parse(res.body);
+                                                        html += `<div class="field is-grouped is-grouped-right">`;
+                                                        res.assets.forEach(function (asset) {
+                                                            html += `<div class="control">
+                                                                <a class="button is-light" href="${asset.browser_download_url}" download="${asset.name}">下载 ${asset.name}</a>
+                                                            </div>`;
+                                                        });
+                                                        html += `</div>`;
+                                                        showGeneralModal(`新版本：${res.tag_name}`, html);
+                                                    }
+                                                    checkUpdateBtn.className = checkUpdateBtn.className.replace(' is-loading', '');
+                                                }
+                                            </script>
                                             {{if .StatEnabled}}
                                             <script src="/public/lib/echarts.min.js"></script>
 
@@ -405,35 +431,6 @@
                                                             document.getElementById('ImageDownloadPermission').value = "{{.ImageDownloadPermission}}";
                                                         })();
                                                     </script>
-                                                </div>
-                                                <div class="column">
-                                                    <h3>系统自定义</h3>
-                                                    <label class="label">修改网站名</label>
-                                                    <div class="field has-addons">
-                                                        <div class="control is-light is-expanded">
-                                                            <input class="input url-input" id="inputWebsiteName"
-                                                                   type="text" value="" placeholder="请输入新的站点名称">
-                                                        </div>
-                                                        <div class="control">
-                                                            <a class="button is-light"
-                                                               onclick="updateOption('WebsiteName', 'inputWebsiteName')">
-                                                                更新
-                                                            </a>
-                                                        </div>
-                                                    </div>
-                                                    <label class="label">修改底部信息</label>
-                                                    <div class="field has-addons">
-                                                        <div class="control is-light is-expanded">
-                                                            <input class="input url-input" id="inputFooterInfo"
-                                                                   type="text" value="" placeholder="请输入 HTML 代码">
-                                                        </div>
-                                                        <div class="control">
-                                                            <a class="button is-light"
-                                                               onclick="updateOption('FooterInfo', 'inputFooterInfo')">
-                                                                更新
-                                                            </a>
-                                                        </div>
-                                                    </div>
                                                     <h3>统计设置</h3>
                                                     <label class="label">是否启用访问数据统计：</label>
                                                     <div class="field has-addons">
@@ -452,6 +449,46 @@
                                                         })();
                                                     </script>
                                                 </div>
+                                                <div class="column">
+                                                    <h3>系统自定义</h3>
+                                                    <label class="label">修改网站名</label>
+                                                    <div class="field has-addons">
+                                                        <div class="control is-light is-expanded">
+                                                            <input class="input url-input" id="inputWebsiteName"
+                                                                   type="text" value="{{.option.WebsiteName}}" placeholder="请输入新的站点名称">
+                                                        </div>
+                                                        <div class="control">
+                                                            <a class="button is-light"
+                                                               onclick="updateOption('WebsiteName', 'inputWebsiteName')">
+                                                                更新
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                    <label class="label">修改底部信息</label>
+                                                    <div class="field has-addons">
+                                                        <div class="control is-light is-expanded">
+                                                            <input class="input url-input" id="inputFooterInfo"
+                                                                   type="text" value="{{.option.FooterInfo}}" placeholder="请输入 HTML 代码">
+                                                        </div>
+                                                        <div class="control">
+                                                            <a class="button is-light"
+                                                               onclick="updateOption('FooterInfo', 'inputFooterInfo')">
+                                                                更新
+                                                            </a>
+                                                        </div>
+                                                    </div>
+                                                    <label class="label">公告设置</label>
+                                                    <div class="field">
+                                                        <div class="control is-light">
+                                                            <textarea class="textarea" id="inputNotice" placeholder="请输入 HTML 代码">{{.option.Notice}}</textarea>
+                                                        </div>
+                                                    </div>
+                                                    <div class="field">
+                                                        <a class="button is-light" onclick="updateOption('Notice', 'inputNotice')">
+                                                            更新
+                                                        </a>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -463,6 +500,20 @@
             </div>
         </div>
     </div>
+    <script>
+        (function () {
+            let params = new URLSearchParams(window.location.search);
+            let tabName = params.get("tab");
+            if (!tabName) {
+                {{if .isAdmin}}
+                tabName = "statusTab";
+                {{else}}
+                tabName = "userTab";
+                {{end}}
+            }
+            openTab(document.getElementById(tabName + "List"), tabName);
+        })();
+    </script>
     {{template "footer" .}}
 </div>
 
